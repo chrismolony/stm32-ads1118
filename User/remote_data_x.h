@@ -33,7 +33,7 @@ typedef struct {
 	uint8_t	USARTm_Tx_Buffer[USARTm_Tx_BUFFER_SIZE]; //队列空间
 	__IO	uint32_t	USARTm_Tx_PTR_HEAD; //队列头指针
 	__IO	uint32_t	USARTm_Tx_PTR_TAIL; //队列尾指针
-	__IO	uint32_t	USARTm_Tx_COUNTER; 	//队列剩余
+	__IO	uint32_t	USARTm_Tx_COUNTER; 	//当前队列长度
 	__IO	uint8_t		USARTm_Tx_BUFFER_FULL;  //队列满标志
 }USARTm_Tx_Buffer_TypeDef;  
 
