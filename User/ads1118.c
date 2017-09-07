@@ -1,6 +1,9 @@
 
 #include "ads1118.h"
-
+/*******************************************
+  ADS1118驱动
+	@StevenShi
+*******************************************/
 
 volatile uint8_t getdata1;
 volatile uint8_t getdata2;
@@ -25,43 +28,42 @@ void ads1118_config(void)
 }
 void SPI_config(void)
 {
-	SPI_InitTypeDef SPI_InitStructure;
-	SPI_RCC_Configuration();
-	SPI_GPIO_Configuration();
-	SPI_NVIC_Configuration();
+		SPI_InitTypeDef SPI_InitStructure;
+		SPI_RCC_Configuration();
+		SPI_GPIO_Configuration();
+		SPI_NVIC_Configuration();
+
+
+		/* Disable SPI_MASTER */
+		SPI_Cmd(SPI_MASTER, DISABLE);
+		/* SPI_MASTER configuration ------------------------------------------------*/
+		SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
+		SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
+		SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
+		SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
+		SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge;
+		SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
+		SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_64;
+		SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
+		SPI_InitStructure.SPI_CRCPolynomial = 7;
+		SPI_Init(SPI_MASTER, &SPI_InitStructure);
+
+
+
+		/* Enable SPI_MASTER TXE interrupt */
+		//SPI_I2S_ITConfig(SPI_MASTER, SPI_I2S_IT_TXE, ENABLE);
+		/* Enable SPI_SLAVE RXNE interrupt */
+		// SPI_I2S_ITConfig(SPI_MASTER, SPI_I2S_IT_RXNE, ENABLE);
+
+
+		/* Enable SPI_MASTER */
+		SPI_Cmd(SPI_MASTER, ENABLE);
 	
-	
-	/* Disable SPI_MASTER */
-  SPI_Cmd(SPI_MASTER, DISABLE);
-  /* SPI_MASTER configuration ------------------------------------------------*/
-  SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
-  SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
-  SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
-  SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
-  SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge;
-  SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
-  SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_64;
-  SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
-  SPI_InitStructure.SPI_CRCPolynomial = 7;
-  SPI_Init(SPI_MASTER, &SPI_InitStructure);
-
-  
-
-  /* Enable SPI_MASTER TXE interrupt */
-  //SPI_I2S_ITConfig(SPI_MASTER, SPI_I2S_IT_TXE, ENABLE);
-  /* Enable SPI_SLAVE RXNE interrupt */
- // SPI_I2S_ITConfig(SPI_MASTER, SPI_I2S_IT_RXNE, ENABLE);
-
-  
-  /* Enable SPI_MASTER */
-  SPI_Cmd(SPI_MASTER, ENABLE);
-	
-
 }
 
 
 /**********************************************************************
-@StevenShi 2017/09/06
+@StevenShi 
 获取片内温度
 **********************************************************************/
 float ads1118_get_temperature(void)
@@ -81,7 +83,7 @@ float ads1118_get_temperature(void)
    
     adc = SPI_read_write_Reg(adsConfigReg.word);
     /*
-    adc = SPI_read_write_Reg(0x859b);//这两种配置都可以读出片内温度
+    adc = SPI_read_write_Reg(0x853b);//这两种配置都可以读出片内温度
     adc = SPI_read_write_Reg(0x859b);
 	  */
 		
@@ -124,26 +126,26 @@ void ads1118_set_config_reg(ADS_InitTypeDef* ConfigReg)
 
 uint16_t ads1118_convert(uint8_t channel)
 {
-	uint16_t adc=0;
-	ADS_InitTypeDef ConfigReg,staus;
+		uint16_t adc=0;
+		ADS_InitTypeDef ConfigReg,staus;
 
-	ConfigReg.word = adsConfigReg.word;           //low ,writing is no effort
-
-	
-	ConfigReg.stru.NOP     =  DATA_VALID;
-	ConfigReg.stru.TS_MODE =  ADC_MODE;
-	ConfigReg.stru.MODE    =  SIGNLE_SHOT;
-	ConfigReg.stru.MUX     =  channel;
-	ConfigReg.stru.OS      =  SINGLE_CONVER_START;   //high
-  
-	adc = SPI_read_write_Reg(ConfigReg.word);
-	//用于寄存器回读 可以不进行此操作 手册中提到在写入寄存器配置后紧接着写0即可回读数据
-	staus.word  = (SPI_read_write_Byte(0x00)&0xff)<<8;
-	staus.word  |= SPI_read_write_Byte(0x00)&0xff;
+		ConfigReg.word = adsConfigReg.word;           //low ,writing is no effort
 
 
-	//printf(" status  %04x   ",staus.word);
-	return   adc;
+		ConfigReg.stru.NOP     =  DATA_VALID;
+		ConfigReg.stru.TS_MODE =  ADC_MODE;
+		ConfigReg.stru.MODE    =  SIGNLE_SHOT;
+		ConfigReg.stru.MUX     =  channel;
+		ConfigReg.stru.OS      =  SINGLE_CONVER_START;   //high
+
+		adc = SPI_read_write_Reg(ConfigReg.word);
+		//用于寄存器回读 可以不进行此操作 手册中提到在写入寄存器配置后紧接着写0即可回读数据
+		staus.word  = (SPI_read_write_Byte(0x00)&0xff)<<8;
+		staus.word  |= SPI_read_write_Byte(0x00)&0xff;
+
+
+		//printf(" status  %04x   ",staus.word);
+		return   adc;
 }
 
 
@@ -153,23 +155,11 @@ uint16_t ads1118_convert(uint8_t channel)
 SPI 写
 ***********************************/
 
-void SPI_write_Byte(u16 TxData)
-{              
-    u8 Temp_Data;
-  
-  Temp_Data = ( TxData >> 8 );
-  while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET){}  
-  SPI_I2S_SendData(SPI2, Temp_Data); 
-
-  Temp_Data = ( TxData & 0xff );
-  while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET){}
-  SPI_I2S_SendData(SPI2, Temp_Data); 
-}
 
 uint8_t SPI_send_Byte(uint8_t byte)
 {
  
-   //循环检测发送缓存是否为空
+   //等待发送缓存空
     while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET)
     {}
 		//发送数据
@@ -182,7 +172,7 @@ uint8_t SPI_send_Byte(uint8_t byte)
  
 }
 /**************************
-16bit 模式读取 DIN发送寄存器配置，DOUT回读转换结果
+16bit 模式读取 DIN接收寄存器配置，DOUT输出转换结果
 **************************/
 uint16_t SPI_read_write_Reg(uint16_t CofigReg)
 {

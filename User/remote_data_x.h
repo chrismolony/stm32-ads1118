@@ -2,7 +2,7 @@
 #define	_REMOTE_DATA_X_H
 #include "stm32f10x.h"
 /*************************************************************
-@StevenShi 2017/09/05
+@StevenShi 
 **************************************************************/
 #define	RS485_ENABLE_PIN					GPIO_Pin_8
 #define	RS485_ENABLE_GPIO					GPIOA
@@ -30,11 +30,11 @@
 
 //队列-用于printf函数要发送的内容
 typedef struct { 	
-	uint8_t	USARTm_Tx_Buffer[USARTm_Tx_BUFFER_SIZE]; //队列空间
-	__IO uint32_t USARTm_Tx_PTR_HEAD; //队列头指针
-	__IO uint32_t USARTm_Tx_PTR_TAIL; //队列尾指针
-	__IO uint32_t USARTm_Tx_COUNTER; 	//队列剩余
-	__IO uint8_t USARTm_Tx_BUFFER_FULL;  //队列满标志
+		uint8_t	USARTm_Tx_Buffer[USARTm_Tx_BUFFER_SIZE]; //队列空间
+		__IO uint32_t USARTm_Tx_PTR_HEAD; //队列头指针
+		__IO uint32_t USARTm_Tx_PTR_TAIL; //队列尾指针
+		__IO uint32_t USARTm_Tx_COUNTER; 	//队列剩余
+		__IO uint8_t USARTm_Tx_BUFFER_FULL;  //队列满标志
 }USARTm_Tx_Buffer_TypeDef;  
 
 //浮点数与HEX快速获取
@@ -62,5 +62,5 @@ int remote_data_x_usart_dma_ctl(void);//该函数用于printf的实现，在串口输出打印调
 uint32_t remote_data_x_usart_In_Queue(uint8_t ch);//将数据放入队列
 uint32_t remote_data_x_usart_Out_Queue(uint8_t *ch);//将数据读出队列
 #endif
-//@StevenShi 2017/09/05
+//@StevenShi 
 /**************************************************************************************************/

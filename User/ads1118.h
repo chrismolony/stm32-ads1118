@@ -141,7 +141,7 @@ void SPI_config(void);
 float ads1118_get_temperature(void);
 void ads1118_set_config_reg(ADS_InitTypeDef* ConfigReg);
 uint16_t ads1118_convert(unsigned char channel);
-void SPI_write_Byte(uint16_t TxData);
+
 uint8_t SPI_send_Byte(uint8_t byte);
 uint16_t SPI_read_write_Reg(uint16_t CofigReg);
 uint16_t SPI_read_write_Byte(uint16_t TxData);
