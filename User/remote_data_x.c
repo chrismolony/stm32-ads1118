@@ -8,18 +8,18 @@
 STM32 USART1 DMA 驱动
 重定向printf函数到DMA
 *****************************************************/
-USARTm_Tx_Buffer_TypeDef USARTm_Tx_Buf_Struct;//队列申请
+USARTm_Tx_Buffer_TypeDef USARTm_Tx_Buf_Queue;//队列申请
 
 //数据入列
 uint32_t remote_data_x_usart_In_Queue(uint8_t data) 
 { 	
-	if(USARTm_Tx_Buf_Struct.USARTm_Tx_COUNTER <USARTm_Tx_BUFFER_SIZE)//判断队列是否满
+	if(USARTm_Tx_Buf_Queue.USARTm_Tx_COUNTER <USARTm_Tx_BUFFER_SIZE)//判断队列是否满
 		{
-			if(USARTm_Tx_Buf_Struct.USARTm_Tx_PTR_HEAD >= USARTm_Tx_BUFFER_SIZE) // 判断队列头指针是否超出队列宽度
-				USARTm_Tx_Buf_Struct.USARTm_Tx_PTR_HEAD = 0; //超出后将头指针指向0 		
-			USARTm_Tx_Buf_Struct.USARTm_Tx_Buffer[USARTm_Tx_Buf_Struct.USARTm_Tx_PTR_HEAD] = data; //将数据放入队列		
-			USARTm_Tx_Buf_Struct.USARTm_Tx_PTR_HEAD++; 	//头指针移动	
-			USARTm_Tx_Buf_Struct.USARTm_Tx_COUNTER++;  	//当前队列长度加一
+			if(USARTm_Tx_Buf_Queue.USARTm_Tx_PTR_HEAD >= USARTm_Tx_BUFFER_SIZE) // 判断队列头指针是否超出队列宽度
+				USARTm_Tx_Buf_Queue.USARTm_Tx_PTR_HEAD = 0; //超出后将头指针指向0 		
+			USARTm_Tx_Buf_Queue.USARTm_Tx_Buffer[USARTm_Tx_Buf_Queue.USARTm_Tx_PTR_HEAD] = data; //将数据放入队列		
+			USARTm_Tx_Buf_Queue.USARTm_Tx_PTR_HEAD++; 	//头指针移动	
+			USARTm_Tx_Buf_Queue.USARTm_Tx_COUNTER++;  	//当前队列长度加一
 			return 0; 	
 		} 		
 	return 1;	 	 
@@ -28,20 +28,20 @@ uint32_t remote_data_x_usart_In_Queue(uint8_t data)
 uint32_t remote_data_x_usart_Out_Queue(uint8_t *data) 
 { 	
 	uint32_t num;
-	if(USARTm_Tx_Buf_Struct.USARTm_Tx_COUNTER > 0) 	//队列不为空才能进行读出操作
+	if(USARTm_Tx_Buf_Queue.USARTm_Tx_COUNTER > 0) 	//队列不为空才能进行读出操作
 		{ 		
-			if(USARTm_Tx_Buf_Struct.USARTm_Tx_PTR_TAIL >= USARTm_Tx_BUFFER_SIZE)//判断队列尾指针是否超出队列宽度 			
-				USARTm_Tx_Buf_Struct.USARTm_Tx_PTR_TAIL = 0;//超出后置0
-			num = USARTm_Tx_Buf_Struct.USARTm_Tx_COUNTER;//记录当前队列数据长度		
-			*data = USARTm_Tx_Buf_Struct.USARTm_Tx_Buffer[USARTm_Tx_Buf_Struct.USARTm_Tx_PTR_TAIL]; //从队列中读出一个数		
-			USARTm_Tx_Buf_Struct.USARTm_Tx_PTR_TAIL++; //尾指针前移		
-			USARTm_Tx_Buf_Struct.USARTm_Tx_COUNTER--; //队列宽度减一 		
+			if(USARTm_Tx_Buf_Queue.USARTm_Tx_PTR_TAIL >= USARTm_Tx_BUFFER_SIZE)//判断队列尾指针是否超出队列宽度 			
+				USARTm_Tx_Buf_Queue.USARTm_Tx_PTR_TAIL = 0;//超出后置0
+			num = USARTm_Tx_Buf_Queue.USARTm_Tx_COUNTER;//记录当前队列数据长度		
+			*data = USARTm_Tx_Buf_Queue.USARTm_Tx_Buffer[USARTm_Tx_Buf_Queue.USARTm_Tx_PTR_TAIL]; //从队列中读出一个数		
+			USARTm_Tx_Buf_Queue.USARTm_Tx_PTR_TAIL++; //尾指针前移		
+			USARTm_Tx_Buf_Queue.USARTm_Tx_COUNTER--; //队列宽度减一 		
 			return num; //返回队列数据长度
 		} 	
 	else 	
 		{ 		
-			*data = 0xff; 		
-			return 0; 	
+			*data = 0xFF; //队列为空，填充一个值		
+			return 0;//返回队列长度0 	
 		} 
 }
 
@@ -303,13 +303,13 @@ void remote_data_x_usart_Init(void)
 //也可以将该函数放到定时中断中去执行 比如sysTick
 int remote_data_x_usart_dma_ctl(void) 
 { 	
-	uint32_t num=0; 	uint8_t ch; 	
+	uint32_t num=0; 	uint8_t data; 	
 	if(DMA_GetCurrDataCounter(USARTm_Tx_DMA_Channe)==0) 
 	{
 		DMA_Cmd(USARTm_Tx_DMA_Channe,DISABLE); 		
-		while((remote_data_x_usart_Out_Queue(&ch))!=0) 		
+		while((remote_data_x_usart_Out_Queue(&data))!=0) 		
 		{	 			
-			USARTmTxBuffer[num]=ch; 			
+			USARTmTxBuffer[num]=data; 			
 			num++; 			
 			if(num==USARTm_Tx_BUFFER_SIZE) 			
 				break; 		
