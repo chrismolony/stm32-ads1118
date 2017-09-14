@@ -1,11 +1,13 @@
 /*******************************************************************
 
 *******************************************************************/
-#ifndef ADS1118_H
-#define ADS1118_H
+#ifndef _ADS1118_H
+#define _ADS1118_H
 #include "stdint.h"
 #include "stm32f10x.h"
 
+#define		DINT()		__disable_irq()
+#define		EINT()		__enable_irq()
 
 //配置寄存器( Config Register )
 //Operational status/single-shot conversion start
@@ -24,20 +26,26 @@
 #define     CONFIG_BIT_PULLUP_EN    (1<<3)
 //NOP: No operation
 #define     CONFIG_BIT_NOP      (3<<1)
-//CNV_RDY_FL: Conversion ready flag
-#define     CONFIG_BIT_CNV_RDY_FL   (1<<0)
+//CONFIG_BIT_RESV: default 
+#define     CONFIG_BIT_RESV   (1<<0)
+
+#define ADS1118_CONST_6_144V_LSB_mV  (0.1875)
+#define ADS1118_CONST_4_096V_LSB_mV  (0.125)
+#define ADS1118_CONST_2_048V_LSB_mV  (0.0625)
+#define ADS1118_CONST_1_024V_LSB_mV  (0.03125)
+#define ADS1118_CONST_0_512V_LSB_mV  (0.015625)
+#define ADS1118_CONST_0_256V_LSB_mV  (0.0078125)
+
+#define SAMPLECOUNTER		9//每次采集9个数进行一次中位值滤波
+
 // ------ Public data type declarations ----------------------------
 /* Private typedef -----------------------------------------------------------*/
-typedef enum 
-{
-	FAILED = 0, 
-	PASSED = !FAILED
-} TestStatus;
+
 typedef union
 {
     struct
     {
-        volatile unsigned char    CNV_RDY_FL  :1;   //low
+        volatile unsigned char    RESV  			:1;   //low
         volatile unsigned char    NOP         :2;
         volatile unsigned char    PULLUP      :1;
         volatile unsigned char    TS_MODE     :1;
@@ -121,6 +129,12 @@ typedef enum
     DATA_NREADY = 0x1
 } ADS_RDY_TypeDef;
 
+typedef struct {
+  double temp_C;
+  double mV;
+} type_k_thermo_lookup_entry_table;
+#define TYPE_K_THERMO_LOOKUP_SIZE 16
+#define DEFAULT_PGA		PGA_2048
 #define ADS1118_DISABLE									GPIO_SetBits(SPI_MASTER_GPIO, SPI_MASTER_PIN_NSS) //CS拉高
 #define ADS1118_ENABLE									GPIO_ResetBits(SPI_MASTER_GPIO, SPI_MASTER_PIN_NSS)//CS拉低
 /***************SPI*******************/
@@ -141,13 +155,18 @@ void SPI_config(void);
 float ads1118_get_temperature(void);
 void ads1118_set_config_reg(ADS_InitTypeDef* ConfigReg);
 uint16_t ads1118_convert(unsigned char channel);
-
+uint16_t ads1118_get_differential_0_1(uint8_t PGA);
+uint16_t ads1118_get_differential_2_3(uint8_t PGA);
+double	ads1118_get_differential_0_1_mv(uint8_t PGA);
+double	ads1118_get_differential_2_3_mv(uint8_t PGA);
 uint8_t SPI_send_Byte(uint8_t byte);
 uint16_t SPI_read_write_Reg(uint16_t CofigReg);
 uint16_t SPI_read_write_Byte(uint16_t TxData);
 void SPI_RCC_Configuration(void);
 void SPI_GPIO_Configuration(void);
 void SPI_NVIC_Configuration(void);
-
+int8_t  ads1118_get_temp_thermo_type_k( double input_voltage_mV, double input_cold_junction_C, double *output_hot_junction_C);
+uint16_t ads1118_median_filter(uint16_t *pbuffer);
+double ads1118_median_average_filter(double *pbuffer);
 #endif
 

@@ -1,7 +1,14 @@
 
 #include "ads1118.h"
+#include "delay.h"
+#include "stdio.h"
+#include "string.h"
+
 /*******************************************
   ADS1118驱动
+	实际测试芯片内部温度会高于室温4-5摄氏度
+	热电偶采集不准确，加入中位值滤波并不能有效
+	去除该现象
 	@StevenShi
 *******************************************/
 
@@ -16,7 +23,7 @@ ADS_InitTypeDef adsConfigReg;//ADS1118配置寄存器
 void ads1118_config(void)
 {
     
-	adsConfigReg.stru.CNV_RDY_FL		=	DATA_READY ;           //low ,writing is no effort
+
 	adsConfigReg.stru.NOP						=	DATA_VALID;
 	adsConfigReg.stru.PULLUP				=	PULL_UP_DIS;
 	adsConfigReg.stru.TS_MODE				=	ADC_MODE;
@@ -25,6 +32,7 @@ void ads1118_config(void)
 	adsConfigReg.stru.PGA						=	PGA_2048;
 	adsConfigReg.stru.MUX						=	AINPN_0_1;
 	adsConfigReg.stru.OS						=	SINGLE_CONVER_START;   //high
+	adsConfigReg.stru.RESV          = CONFIG_BIT_RESV;
 }
 void SPI_config(void)
 {
@@ -40,10 +48,10 @@ void SPI_config(void)
 	SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
 	SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
 	SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
-	SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
-	SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge;
+	SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;//SCK空闲时低
+	SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge;//第二个跳变沿采样
 	SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
-	SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_64;
+	SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_128;
 	SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
 	SPI_InitStructure.SPI_CRCPolynomial = 7;
 	SPI_Init(SPI_MASTER, &SPI_InitStructure);
@@ -64,7 +72,7 @@ void SPI_config(void)
 
 /**********************************************************************
 @StevenShi 
-获取片内温度
+获取片内温度 采用16bits模式
 **********************************************************************/
 float ads1118_get_temperature(void)
 {
@@ -74,18 +82,39 @@ float ads1118_get_temperature(void)
  
 	adsConfigReg.stru.NOP     =  DATA_VALID;
 	adsConfigReg.stru.TS_MODE =  TEMPERATURE_MODE;
-	adsConfigReg.stru.DR      =  DR_8_SPS;
+	adsConfigReg.stru.DR      =  DR_860_SPS;
 	adsConfigReg.stru.MODE    =  SIGNLE_SHOT;
-	adsConfigReg.stru.OS      =  SINGLE_CONVER_START;   
-	
+	adsConfigReg.stru.OS      =  SINGLE_CONVER_START; 
+	adsConfigReg.stru.PULLUP	= 	PULL_UP_EN;	
+	adsConfigReg.stru.RESV		=		CONFIG_BIT_RESV;
 	
 	ADS1118_ENABLE;
- 
+	delay_us((uint32_t)100);
 	adc = SPI_read_write_Reg(adsConfigReg.word);
-	/*
-	adc = SPI_read_write_Reg(0x853b);//这两种配置都可以读出片内温度
-	adc = SPI_read_write_Reg(0x859b);
-	*/
+	//adc = SPI_read_write_Reg(0x81f3);
+	delay_us((uint32_t)100);
+	ADS1118_DISABLE;
+	delay_ms(1);
+	
+	ADS1118_ENABLE;
+	adsConfigReg.stru.NOP     =  DATA_INVALID;
+	adsConfigReg.stru.TS_MODE =  TEMPERATURE_MODE;
+	adsConfigReg.stru.DR      =  DR_860_SPS;
+	adsConfigReg.stru.MODE    =  SIGNLE_SHOT;
+	adsConfigReg.stru.OS      =  SINGLE_CONVER_START; 
+	adsConfigReg.stru.PULLUP	= 	PULL_UP_EN;	
+	adsConfigReg.stru.RESV		=		CONFIG_BIT_RESV;
+	delay_us((uint32_t)100);
+	//等待DOUT给出数据有效信号-从高变低
+	while(GPIO_ReadInputDataBit(SPI_MASTER_GPIO,SPI_MASTER_PIN_MISO));
+	adc = SPI_read_write_Reg(adsConfigReg.word);
+	//adc = SPI_read_write_Reg(0x81f3);
+	delay_us((uint32_t)100);
+	//
+//	adc = SPI_read_write_Reg(0x853b);//这两种配置都可以读出片内温度
+	//adc = SPI_read_write_Reg(0x859b);
+	//
+	ADS1118_DISABLE;
 	
 	//conver to temperture
 	if(adc&0x8000)//温度负值处理
@@ -100,7 +129,7 @@ float ads1118_get_temperature(void)
 		adc>>=2;
 		value=adc*0.03125;     
 	}
-	ADS1118_DISABLE;
+	
 	return value;
     
 }
@@ -110,8 +139,155 @@ void ads1118_set_config_reg(ADS_InitTypeDef* ConfigReg)
 {
 	adsConfigReg.word=ConfigReg->word;
 }
+//获取差分输入 AIN0 AIN1
+uint16_t ads1118_get_differential_0_1(uint8_t PGA)
+{
+	uint16_t adc=0;
 
+	ADS_InitTypeDef ConfigReg;
 
+	ConfigReg.stru.NOP			=	DATA_VALID;
+	ConfigReg.stru.TS_MODE	=	ADC_MODE;
+	ConfigReg.stru.DR      =  DR_860_SPS;
+	ConfigReg.stru.PGA      = PGA;
+	ConfigReg.stru.MODE			=	SIGNLE_SHOT;
+	ConfigReg.stru.OS				=	SINGLE_CONVER_START;   //high
+	ConfigReg.stru.MUX			=	AINPN_0_1;
+	ConfigReg.stru.PULLUP		= PULL_UP_EN;
+	ConfigReg.stru.RESV			= CONFIG_BIT_RESV;
+	ADS1118_ENABLE;
+	delay_us((uint32_t)1);
+	adc = SPI_read_write_Reg(ConfigReg.word);
+	
+	ADS1118_DISABLE;
+	delay_ms(1);
+	ADS1118_ENABLE;
+	ConfigReg.stru.NOP			=	DATA_INVALID;
+	ConfigReg.stru.TS_MODE	=	ADC_MODE;
+	ConfigReg.stru.DR      =  DR_860_SPS;
+	ConfigReg.stru.PGA      = PGA;
+	ConfigReg.stru.MODE			=	SIGNLE_SHOT;
+	ConfigReg.stru.OS				=	SINGLE_CONVER_START;   //high
+	ConfigReg.stru.MUX			=	AINPN_0_1;
+	ConfigReg.stru.PULLUP		= PULL_UP_EN;
+	ConfigReg.stru.RESV			= CONFIG_BIT_RESV;
+	delay_us((uint32_t)1);
+	
+	//等待DOUT给出数据有效信号-从高变低
+	while(GPIO_ReadInputDataBit(SPI_MASTER_GPIO,SPI_MASTER_PIN_MISO));
+	adc = SPI_read_write_Reg(ConfigReg.word);
+	delay_us(1);
+	ADS1118_DISABLE;
+	return   adc;
+}
+
+double ads1118_get_differential_0_1_mv(uint8_t PGA)
+{
+	double t_mv=0.0;
+	
+	uint8_t i;
+	uint16_t adc_raw[SAMPLECOUNTER],adc_raw_final;
+	for(i=0;i<SAMPLECOUNTER;i++)
+	adc_raw[i] = ads1118_get_differential_0_1(PGA);
+	//printf("\n\rGet from ADS1118 channel AIN0-1:0x%02x\n",adc_raw);
+	adc_raw_final = ads1118_median_filter(adc_raw);
+	
+	switch(PGA){
+		case PGA_6144:
+			t_mv =  adc_raw_final * ADS1118_CONST_6_144V_LSB_mV;
+			break;
+		case PGA_4096:
+			t_mv =  adc_raw_final * ADS1118_CONST_4_096V_LSB_mV;
+			break;
+		case PGA_2048:
+			t_mv =  adc_raw_final * ADS1118_CONST_2_048V_LSB_mV;
+			break;
+		case PGA_1024:
+			t_mv =  adc_raw_final * ADS1118_CONST_1_024V_LSB_mV;
+			break;
+		case PGA_512:
+			t_mv =  adc_raw_final * ADS1118_CONST_0_512V_LSB_mV;
+			break;
+		case PGA_256:
+			t_mv =  adc_raw_final * ADS1118_CONST_0_256V_LSB_mV;
+			break;
+		default:
+			break;
+	}
+	return t_mv;
+}
+//获取差分输入 AIN2 AIN3
+uint16_t ads1118_get_differential_2_3(uint8_t PGA)
+{
+	uint16_t adc=0;
+
+	ADS_InitTypeDef ConfigReg;
+
+	ConfigReg.stru.NOP			=	DATA_VALID;
+	ConfigReg.stru.TS_MODE	=	ADC_MODE;
+	ConfigReg.stru.DR      =  DR_860_SPS;
+	ConfigReg.stru.PGA      = PGA;
+	ConfigReg.stru.MODE			=	SIGNLE_SHOT;
+	ConfigReg.stru.OS				=	SINGLE_CONVER_START;   //high
+	ConfigReg.stru.MUX			=	AINPN_2_3;
+	ConfigReg.stru.PULLUP		= PULL_UP_EN;
+	ConfigReg.stru.RESV			= CONFIG_BIT_RESV;
+	ADS1118_ENABLE;
+	delay_us((uint32_t)1);
+	adc = SPI_read_write_Reg(ConfigReg.word);
+	
+	ADS1118_DISABLE;
+	delay_ms(1);
+	ADS1118_ENABLE;
+	ConfigReg.stru.NOP			=	DATA_INVALID;
+	ConfigReg.stru.TS_MODE	=	ADC_MODE;
+	ConfigReg.stru.DR      =  DR_860_SPS;
+	ConfigReg.stru.PGA      = PGA;
+	ConfigReg.stru.MODE			=	SIGNLE_SHOT;
+	ConfigReg.stru.OS				=	SINGLE_CONVER_START;   //high
+	ConfigReg.stru.MUX			=	AINPN_2_3;
+	ConfigReg.stru.PULLUP		= PULL_UP_EN;
+	ConfigReg.stru.RESV			= CONFIG_BIT_RESV;
+	delay_us((uint32_t)1);
+	
+	//等待DOUT给出数据有效信号-从高变低
+	while(GPIO_ReadInputDataBit(SPI_MASTER_GPIO,SPI_MASTER_PIN_MISO));
+	adc = SPI_read_write_Reg(ConfigReg.word);
+	delay_us(1);
+	ADS1118_DISABLE;
+	return   adc;
+}
+
+double ads1118_get_differential_2_3_mv(uint8_t PGA)
+{
+	double t_mv=0.0;
+	uint16_t adc_raw;
+	adc_raw = ads1118_get_differential_2_3(PGA);
+	
+	switch(PGA){
+		case PGA_6144:
+			t_mv =  adc_raw * ADS1118_CONST_6_144V_LSB_mV;
+			break;
+		case PGA_4096:
+			t_mv =  adc_raw * ADS1118_CONST_4_096V_LSB_mV;
+			break;
+		case PGA_2048:
+			t_mv =  adc_raw * ADS1118_CONST_2_048V_LSB_mV;
+			break;
+		case PGA_1024:
+			t_mv =  adc_raw * ADS1118_CONST_1_024V_LSB_mV;
+			break;
+		case PGA_512:
+			t_mv =  adc_raw * ADS1118_CONST_0_512V_LSB_mV;
+			break;
+		case PGA_256:
+			t_mv =  adc_raw * ADS1118_CONST_0_256V_LSB_mV;
+			break;
+		default:
+			break;
+	}
+	return t_mv;
+}
 /***************************************************
 单次转换函数，输入参数为通道
 	AINPN_0_1 	= 	0x0,
@@ -127,24 +303,38 @@ void ads1118_set_config_reg(ADS_InitTypeDef* ConfigReg)
 uint16_t ads1118_convert(uint8_t channel)
 {
 	uint16_t adc=0;
-	ADS_InitTypeDef ConfigReg,staus;
-
-	ConfigReg.word = adsConfigReg.word;           //low ,writing is no effort
-
+	
+	ADS_InitTypeDef ConfigReg;
 
 	ConfigReg.stru.NOP			=	DATA_VALID;
 	ConfigReg.stru.TS_MODE	=	ADC_MODE;
+	ConfigReg.stru.DR      =  DR_128_SPS;
+	ConfigReg.stru.PGA      = PGA_2048;
 	ConfigReg.stru.MODE			=	SIGNLE_SHOT;
-	ConfigReg.stru.MUX			=	channel;
 	ConfigReg.stru.OS				=	SINGLE_CONVER_START;   //high
-
+	ConfigReg.stru.MUX			=	channel;
+	if(channel > 3)
+		return 0;
+	ADS1118_ENABLE;
+	delay_us((uint32_t)1);
 	adc = SPI_read_write_Reg(ConfigReg.word);
-	//用于寄存器回读 可以不进行此操作 手册中提到在写入寄存器配置后紧接着写0即可回读数据
-	staus.word  = (SPI_read_write_Byte(0x00)&0xff)<<8;
-	staus.word  |= SPI_read_write_Byte(0x00)&0xff;
-
-
-	//printf(" status  %04x   ",staus.word);
+	ADS1118_DISABLE;
+	delay_ms(1);
+	
+	ADS1118_ENABLE;
+	ConfigReg.stru.NOP			=	DATA_INVALID;
+	ConfigReg.stru.TS_MODE	=	ADC_MODE;
+	ConfigReg.stru.DR      =  DR_128_SPS;
+	ConfigReg.stru.PGA      = PGA_2048;
+	ConfigReg.stru.MODE			=	SIGNLE_SHOT;
+	ConfigReg.stru.OS				=	SINGLE_CONVER_START;   //high
+	ConfigReg.stru.MUX			=	channel;
+	delay_us((uint32_t)1);
+	//等待DOUT给出数据有效信号-从高变低
+	while(GPIO_ReadInputDataBit(SPI_MASTER_GPIO,SPI_MASTER_PIN_MISO));
+	adc = SPI_read_write_Reg(ConfigReg.word);
+	delay_us(1);
+	ADS1118_DISABLE;
 	return   adc;
 }
 
@@ -154,8 +344,6 @@ uint16_t ads1118_convert(uint8_t channel)
 /***********************************
 SPI 写
 ***********************************/
-
-
 uint8_t SPI_send_Byte(uint8_t byte)
 {
  
@@ -187,7 +375,6 @@ uint16_t SPI_read_write_Reg(uint16_t CofigReg)
 /************************************
 SPI 读
 ************************************/
-
 uint16_t SPI_read_write_Byte(uint16_t TxData)
 {    
   uint8_t Temp_Data;
@@ -280,6 +467,123 @@ void SPI_NVIC_Configuration(void)
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
 }
+//温度电压值 K型热电偶
+//第一列为温度 第二列为电压单位是mv
+type_k_thermo_lookup_entry_table type_k_thermo_lookup[TYPE_K_THERMO_LOOKUP_SIZE] = {
+{-200,-5.891},
+{-100,-3.554},
+{0,0},
+{100,4.096},
+{200,8.138},
+{300,12.209},
+{400,16.397},
+{500,20.644},
+{600,24.905},
+{700,29.129},
+{800,33.275},
+{900,37.326},
+{1000,41.276},
+{1100,45.119},
+{1200,48.838},
+{1300,52.410}
+};
+int8_t  ads1118_get_temp_thermo_type_k( double input_voltage_mV, double input_cold_junction_C, double *output_hot_junction_C) {
+    const type_k_thermo_lookup_entry_table  *type_k_thermo_lookup_table;
+          uint8_t                type_k_thermo_lookup_size;
 
+		uint32_t i=1;
+    double total_mV;
+		type_k_thermo_lookup_table = type_k_thermo_lookup;
+		type_k_thermo_lookup_size  = TYPE_K_THERMO_LOOKUP_SIZE;
+            
 
+    // 查看数据是否超出范围
+    if ( (input_cold_junction_C < type_k_thermo_lookup_table[0].temp_C) ||
+         (input_cold_junction_C > type_k_thermo_lookup_table[type_k_thermo_lookup_size-1].temp_C) ) {
+        *output_hot_junction_C = 0;
+        return -1;
+    }
+    
+   //查找冷端温度所在的位置
+    while ( i<(type_k_thermo_lookup_size-1)) {
+        if ( input_cold_junction_C <= type_k_thermo_lookup_table[i].temp_C ) {
+            break;
+        }
+        i++;
+    }
+	//根据冷端温度的值，找出对应的电压值,并且计算总的电压值
+		//该部分可以参考TI官方的方案
+    total_mV = type_k_thermo_lookup_table[i-1].mV + 
+          ( type_k_thermo_lookup_table[i].mV     - type_k_thermo_lookup_table[i-1].mV ) *
+        ( ( input_cold_junction_C                   - type_k_thermo_lookup_table[i-1].temp_C ) / 
+          ( type_k_thermo_lookup_table[i].temp_C - type_k_thermo_lookup_table[i-1].temp_C )  );
+    
+    total_mV += input_voltage_mV;
+    
+    //查看电压是否超出范围
+    if ( (total_mV < type_k_thermo_lookup_table[0].mV) ||
+         (total_mV > type_k_thermo_lookup_table[type_k_thermo_lookup_size-1].mV) ) {
+        *output_hot_junction_C = 0;
+        return -1;
+    }
 
+    //反向查表
+    i=1;
+    while ( i<(type_k_thermo_lookup_size-1) ) {
+        if ( total_mV <= type_k_thermo_lookup_table[i].mV ) {
+            break;
+        }
+        i++;
+    }
+		//将电压转换成温度
+    *output_hot_junction_C = type_k_thermo_lookup_table[i-1].temp_C + 
+          ( type_k_thermo_lookup_table[i].temp_C - type_k_thermo_lookup_table[i-1].temp_C ) *
+        ( ( total_mV                      - type_k_thermo_lookup_table[i-1].mV ) / 
+          ( type_k_thermo_lookup_table[i].mV     - type_k_thermo_lookup_table[i-1].mV )  );
+    
+    return 0;
+}
+//中位值滤波
+//输入数组首地址
+uint16_t ads1118_median_filter(uint16_t *pbuffer)  
+{  
+uint16_t value_buf_input[SAMPLECOUNTER];  
+uint8_t i,j,temp;  
+memcpy(value_buf_input,pbuffer,SAMPLECOUNTER);
+for (j=0;j<=SAMPLECOUNTER;j++){  
+   for (i=0;i<=SAMPLECOUNTER-j;i++){  
+        if (value_buf_input[i] > value_buf_input[i+1])  
+        {  
+            temp = value_buf_input[i];  
+            value_buf_input[i] = value_buf_input[i+1];  
+            value_buf_input[i+1] = temp;  
+        }  
+    }  
+}  
+return value_buf_input[(SAMPLECOUNTER-1)/2]; //排序后取中间那个值 
+}
+//中位值平均滤波
+double ads1118_median_average_filter(double *pbuffer) 
+{ 
+   uint8_t count,i,j; 
+   double value_buf_input[SAMPLECOUNTER]; 
+   double  sum=0,temp; 
+   memcpy(value_buf_input,pbuffer,SAMPLECOUNTER);
+	
+   for (j=0;j<SAMPLECOUNTER-1;j++) 
+   { 
+      for (i=0;i<SAMPLECOUNTER-j;i++) 
+      { 
+         if ( value_buf_input[i]>value_buf_input[i+1] ) 
+         { 
+            temp = value_buf_input[i]; 
+            value_buf_input[i] = value_buf_input[i+1];  
+             value_buf_input[i+1] = temp; 
+         } 
+      } 
+   } 
+	 //去掉最小值与最大值 然后求平均值
+   for(count=1;count<SAMPLECOUNTER-1;count++) 
+      sum += value_buf_input[count]; 
+   return (double)(sum/(SAMPLECOUNTER-2)); 
+}

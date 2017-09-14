@@ -25,7 +25,7 @@
 
 
 #define ADS1118_VALUE		2   //ads1118测试
-#define USARTm_Tx_BUFFER_SIZE	128 //发送缓存长度
+#define USARTm_Tx_BUFFER_SIZE	256 //发送缓存长度
 #define USARTm_Rx_BUFFER_SIZE	32  //接收缓存长度
 
 //队列-用于printf函数要发送的内容
