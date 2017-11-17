@@ -1,6 +1,6 @@
 
 /*********************************************
-STM32F103 ADC¿¿¿ADS1118¿¿
+STM32F103 ADC²âÊÔÓëADS1118²âÊÔ
 @StevenShi
 *********************************************/
 /* Includes ------------------------------------------------------------------*/
@@ -36,16 +36,15 @@ int main(void)
 	
 	while (1)
 	{
-		printf("\n\r--------------ADS1118¿¿---------------------\n ");
-		//¿¿ADS1118¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿
-		//¿¿¿¿¿¿¿¿¿4-5¿¿¿
-		//¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿
+		printf("\n\r--------------ADS1118²âÊÔ---------------------\n ");
+		//ÒòÎªADS1118ÄÚ²¿ÎÂ¶È´«¸ĞÆ÷²âÊÔµÄÊÇĞ¾Æ¬ÄÚ²¿ÎÂ¶È£¬ÄÚ²¿ÓĞ¹¦ºÄÓë·¢ÈÈ£¬ËùÒÔÒ»°ã»á±ÈÊÒÎÂÒª¸ß4-5ÉãÊÏ¶È
+		//Êµ¼Ê²âÊÔÂË²¨²¢²»ÄÜÈ¥³ıÈÈµçÅ¼ÎÂ¶È²»ÎÈ¶¨ÏÖÏó
 		remote_data_x_usart_write_enable();
 		TempC = ads1118_get_temperature();
 		printf("\n\rGet on chip temperature sensor: %0.2f (C)\n",TempC);
 		counter_0_1 = SAMPLECOUNTER;
 		delay_ms(200);//
-		//¿¿¿¿¿¿AIN0 AIN1 ¿¿¿¿
+		/**»ñÈ¡²î·ÖÊäÈë AIN0 AIN1 ÈÈµçÅ¼Öµ**/
 		memset(TempH_0_1,0,SAMPLECOUNTER);
 		for(i=0;i<SAMPLECOUNTER;i++){
 			read_mv_0_1 = ads1118_get_differential_0_1_mv((uint8_t)DEFAULT_PGA);
@@ -60,7 +59,7 @@ int main(void)
 		
 		delay_ms(10);
 		
-		//¿¿AIN2 AIN3 ¿¿¿¿
+		/*****»ñÈ¡AIN2 AIN3 ÈÈµçÅ¼Öµ***********/
 		counter_2_3 = SAMPLECOUNTER;
 		memset(TempH_2_3,0,SAMPLECOUNTER);
 		TempH_2_3_filter = 0;
@@ -75,7 +74,7 @@ int main(void)
 			TempH_2_3_filter = ads1118_median_average_filter(TempH_2_3);
 		EINT();
 		printf("\n\rGet hot junction temperature AIN2-3: %0.2f (C)\n",TempH_2_3_filter);
-		//¿¿AD¿¿¿¿
+		//´òÓ¡AD×ª»»µÄÖµ
 		printf("\n\r----------------------------------------------\n ");	
 		printf("\r\nADC10:0x%02x\n",get_adc[0]);
 		printf("\r\nADC11:0x%02x\n",get_adc[1]);
@@ -112,3 +111,9 @@ void assert_failed(uint8_t* file, uint32_t line)
 
 #endif
 
+/**
+  * @}
+  */ 
+
+
+/******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/
