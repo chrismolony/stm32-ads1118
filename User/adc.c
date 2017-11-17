@@ -1,6 +1,6 @@
 /*************************
 @StevenShi
-ADC ÅäÖÃ Ê¹ÓÃDMA»ñÈ¡ADC×ª»»Öµ
+ADC ¿¿ ¿¿DMA¿¿¿¿
 *************************/
 #include "adc.h"
 
@@ -33,11 +33,11 @@ void ADC_DMA_Config()
   DMA_InitStructure.DMA_PeripheralBaseAddr = ADC_DR_ADDRESS;
   DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)&get_adc;
   DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
-  DMA_InitStructure.DMA_BufferSize = 3;
+  DMA_InitStructure.DMA_BufferSize = 3;//¿¿¿¿ 
   DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
   DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Disable;
-  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
-  DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;//¿¿¿¿16bits
+  DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;//¿¿16bits
   DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
   DMA_InitStructure.DMA_Priority = DMA_Priority_High;
   DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
@@ -54,7 +54,7 @@ void ADC_Config()
   ADC_InitStructure.ADC_ScanConvMode = ENABLE;
   ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
   ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None;
-  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;//¿¿¿
   ADC_InitStructure.ADC_NbrOfChannel = 3;
   ADC_Init(ADC_USE_MODEL, &ADC_InitStructure);
 	
